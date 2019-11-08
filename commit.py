@@ -10,16 +10,11 @@ def commit(repo, auth, files, message, branch="master"):
     either new or updated.  Everything committed in one shot.
     """
     old_commit = get_latest_commit(repo, auth, branch)
-    print(f'Old commit {old_commit}')
     old_tree = get_tree(repo, auth, old_commit)
-    print(f'Old tree {old_tree}')
     blobs = {}
     for path in files.keys():
-        print(f'Processing path {path}')
         contents = files[path]
-        print(f'with contents {contents}')
         blobs[path] = create_blob(repo, auth, contents)
-        print(f'blob created {blobs[path]}')
     new_tree = create_tree(repo, auth, old_tree, blobs)
     new_commit = create_commit(repo, auth, old_commit, new_tree, message)
     update_branch(repo, auth, new_commit, branch)
@@ -28,7 +23,6 @@ def commit(repo, auth, files, message, branch="master"):
 def get_latest_commit(repo, auth, branch):
     body = get(f'{GITHUB_API_ROOT}/repos/{repo}/git/ref/heads/{branch}', auth)
     sha = body['object']['sha']
-    print(f'SHA latest commit: {sha}')
     return get_commit(repo, auth, sha)
 
 
@@ -59,18 +53,15 @@ def create_tree(repo, auth, old_tree, blobs):
         tree['sha'] = blobs[path]['sha']
         post_data['tree'].append(tree)
 
-    print(f'CREATE TREE DATA: {post_data}')
     return post(f'{GITHUB_API_ROOT}/repos/{repo}/git/trees', auth, post_data)
 
 
 def create_commit(repo, auth, old_commit, new_tree, message):
-    print(f'COMMITTING WITH TREE {new_tree}')
     post_data = {
         'message': message,
         'tree': new_tree['sha'],
         'parents': [old_commit['sha']]
     }
-    print(f'CREATING COMMIT {post_data}')
     return post(f'{GITHUB_API_ROOT}/repos/{repo}/git/commits', auth, post_data)
 
 
@@ -105,11 +96,3 @@ def patch(url, auth, data):
         raise Exception(f'PATCH {url} failed with {r.status_code}, {r.json()}')
     else:
         return r.json()
-
-
-if __name__ == "__main__":
-    commit('drivet/test-repo',
-           ('drivet', '07432ad94bf16a77fe181a8811cb36083be0bd47'),
-           {
-               'hello/foo.txt': 'heheheheh',
-           }, 'commit this stuff again')

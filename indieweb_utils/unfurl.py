@@ -1,5 +1,8 @@
 import opengraph
 from micawber.providers import bootstrap_noembed
+from PIL import Image
+import requests
+from io import BytesIO
 
 
 class PreviewGenerator(object):
@@ -21,5 +24,10 @@ class PreviewGenerator(object):
 
         result = opengraph.OpenGraph(url=url)
         if result:
+            if 'image:width' not in result or 'image:height' not in result:
+                response = requests.get(result.image)
+                img = Image.open(BytesIO(response.content))
+                result['image:width'] = img.width
+                result['image:height'] = img.height
             return result
         return None

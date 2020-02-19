@@ -5,6 +5,7 @@ import requests
 from io import BytesIO
 import mf2py
 import mf2util
+import dateutil.parser
 
 
 def elide(s, maxchars):
@@ -25,18 +26,25 @@ def fetch_image_dimensions(result):
     result['image:height'] = img.height
 
 
+def fetch_post_type(parsed):
+    hentry = mf2util.find_first_entry(parsed, ['h-entry'])
+    if hentry:
+        return mf2util.post_type_discovery(hentry)
+    else:
+        return 'note'
+
+
 def fetch_mf2_result(url):
     parsed = mf2py.Parser(url=url).to_dict()
     if not parsed:
         return None
 
-    entry = mf2util.interpret_entry(parsed, url, want_json=True)
-    post_type = mf2util.post_type_discovery(parsed)
-    print('ddd ' + mf2util.get_plain_text(entry.get('name')))
-    print('fff ' + mf2util.get_plain)
     result = {}
     result['mf2'] = True
-    result['type'] = 'mf2:' + post_type
+    result['type'] = 'mf2:' + fetch_post_type(parsed)
+
+    entry = mf2util.interpret_entry(parsed, url, want_json=True)
+    print(entry)
     if 'name' in entry:
         result['title'] = entry['name']
 
@@ -50,6 +58,11 @@ def fetch_mf2_result(url):
 
     if 'author' in entry:
         result['author'] = entry['author']
+
+    if 'published' in entry:
+        result['published'] = entry['published']
+        date = dateutil.parser.parse(entry['published'])
+        result['published_locale'] = date.strftime('%d %b, %Y %H:%M %p')
 
     if 'featured' in entry:
         result['image'] = entry['featured']
@@ -93,10 +106,12 @@ class PreviewGenerator(object):
             return result
 
         mf2_result = fetch_mf2_result(url)
-        if mf2_result and 'image:width' in mf2_result and \
-           int(mf2_result['image:width']) > 300:
-            # mf2 has a large image, don't bother with og
-            return mf2_result
+        mf2_image_width = None
+        if mf2_result and 'image:width' in mf2_result:
+            mf2_image_width = int(mf2_result['image:width'])
+            if mf2_image_width > 300:
+                # mf2 has a large image, don't bother with og
+                return mf2_result
 
         # mf2 has small or no photo, try og
         og_result = fetch_og_result(url)
@@ -105,5 +120,4 @@ class PreviewGenerator(object):
             # og has larger photo (or there's no mf2), prefer og
             return og_result
 
-        print('gggggg ' + str(mf2_result))
         return mf2_result

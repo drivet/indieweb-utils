@@ -6,6 +6,7 @@ from io import BytesIO
 import mf2py
 import mf2util
 import dateutil.parser
+from indieweb_utils.notedown import convert2html
 
 
 def elide(s, maxchars):
@@ -48,9 +49,9 @@ def fetch_mf2_result(url):
         result['title'] = entry['name']
 
     if 'summary' in entry:
-        result['description'] = elide(entry['summary'], 500)
+        result['description'] = convert2html(elide(entry['summary'], 500), True)
     elif 'content' in entry:
-        result['description'] = elide(entry['content-plain'], 500)
+        result['description'] = convert2html(elide(entry['content-plain'], 500), True)
 
     if 'url' in entry:
         result['url'] = entry['url']
@@ -71,7 +72,7 @@ def fetch_mf2_result(url):
     fetch_image_dimensions(result)
 
     if 'title' not in result and 'description' not in result:
-        result = None
+        result = {}
 
     return result
 
@@ -82,7 +83,7 @@ def fetch_og_result(url):
         if 'title' in result or 'description' in result:
             fetch_image_dimensions(result)
             return result
-    return None
+    return {}
 
 
 class PreviewGenerator(object):
@@ -104,7 +105,7 @@ class PreviewGenerator(object):
                 embed = list(items)[0][1]
                 if 'html' in embed:
                     return embed
-        return None
+        return {}
 
     def preview(self, url):
         result = self.fetch_micawber_result(url)

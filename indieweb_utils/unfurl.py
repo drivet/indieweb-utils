@@ -44,7 +44,6 @@ def fetch_mf2_result(url):
     result['type'] = 'mf2:' + fetch_post_type(parsed)
 
     entry = mf2util.interpret_entry(parsed, url, want_json=True)
-    print(entry)
     if 'name' in entry:
         result['title'] = entry['name']
 
@@ -71,14 +70,18 @@ def fetch_mf2_result(url):
 
     fetch_image_dimensions(result)
 
+    if 'title' not in result and 'description' not in result:
+        result = None
+
     return result
 
 
 def fetch_og_result(url):
     result = opengraph.OpenGraph(url=url)
     if result:
-        fetch_image_dimensions(result)
-        return result
+        if 'title' in result or 'description' in result:
+            fetch_image_dimensions(result)
+            return result
     return None
 
 
@@ -90,7 +93,7 @@ class PreviewGenerator(object):
         self.providers = []
         self.providers.append(bootstrap_noembed())
 
-    def fetch_oembed_result(self, url):
+    def fetch_micawber_result(self, url):
         if not self.providers:
             self.initialize()
 
@@ -98,26 +101,31 @@ class PreviewGenerator(object):
             result = p.extract(url)
             if result[1]:
                 items = result[1].items()
-                return list(items)[0][1]
+                embed = list(items)[0][1]
+                if 'html' in embed:
+                    return embed
+        return None
 
     def preview(self, url):
-        result = self.fetch_oembed_result(url)
+        result = self.fetch_micawber_result(url)
         if result:
             return result
 
         mf2_result = fetch_mf2_result(url)
-        mf2_image_width = None
-        if mf2_result and 'image:width' in mf2_result:
-            mf2_image_width = int(mf2_result['image:width'])
-            if mf2_image_width > 300:
-                # mf2 has a large image, don't bother with og
-                return mf2_result
+        if mf2_result and 'image:width' in mf2_result and \
+           int(mf2_result['image:width']) > 300:
+            # mf2 has a large image, don't bother with og
+            return mf2_result
 
-        # mf2 has small or no photo, try og
+        # no mf2 or mf2 has small or no photo, try og
         og_result = fetch_og_result(url)
-        if mf2_result is None or ('image:width' in og_result and
-                                  int(og_result['image:width']) > 300):
-            # og has larger photo (or there's no mf2), prefer og
+        if not mf2_result:
+            return og_result
+
+        # there's an mf2 result, but the photo is small or missing
+        if og_result and 'image:width' in og_result and \
+           int(og_result['image:width']) > 300:
+            # og has large photo, prefer og
             return og_result
 
         return mf2_result
